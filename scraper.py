@@ -1,5 +1,6 @@
 import re
 from urllib.parse import urlparse
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 # only crawl the following URLS and paths (valid domains)
@@ -20,7 +21,7 @@ def extract_next_links(url, resp):
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
     try:
-        soup = BeautifulSoup(resp.raw_response.content) # raw_response.content gives you the webpage html content
+        soup = BeautifulSoup(resp.raw_response.content, features="lxml") # raw_response.content gives you the webpage html content, pass additional argument of parser specified to lxml
         links = set() # create empty set to store UNIQUE URLs found on page
         
         # urlparse breaks down URL into its compoentns (scheme, netloc, path, query, etc.)
@@ -28,7 +29,7 @@ def extract_next_links(url, resp):
 
         for anchor in soup.find_all("a", href=True): # find all anchor tags <a> that define href attributes (hyperlinks)
             # transform relative to absolute URLs
-            absolute_url = urljoin(base_url, tag["href"].strip()) # constructs full url by joining base w/ whatever hyperlinks are found on page
+            absolute_url = urljoin(base_url, anchor["href"].strip()) # constructs full url by joining base w/ whatever hyperlinks are found on page
             links.add(absolute_url)
 
         return list(links) # converts set (uniqueness) to list (return value)
