@@ -1,5 +1,6 @@
 import re
 from urllib.parse import urlparse
+from bs4 import BeautifulSoup
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -15,7 +16,24 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    return list()
+    try:
+        soup = BeautifulSoup(resp.raw_response.content) # raw_response.content gives you the webpage html content
+        links = set() # create empty set to store UNIQUE URLs found on page
+        
+        # urlparse breaks down URL into its compoentns (scheme, netloc, path, query, etc.)
+        base_url = urlparse(url).scheme + "://" + urlparse(url).netloc # netloc aka authority
+
+        for anchor in soup.find_all("a", href=True): # find all anchor tags <a> that define href attributes (hyperlinks)
+            # transform relative to absolute URLs
+            absolute_url = urljoin(base_url, tag["href"].strip()) # constructs full url by joining base w/ whatever hyperlinks are found on page
+            links.add(absolute_url)
+
+        return list(links) # converts set (uniqueness) to list (return value)
+    
+    except Exception as e:
+        print(f"Error parsing {url}: {e}") # parsing fails
+        return [] # returns empty list
+    # return list()
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
@@ -38,3 +56,7 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+
+def defragment(url): # preserves the original url w/o fragment
+    parsed = urlparse(url)
+    return parsed.scheme + "://" + parsed.netloc + parsed.path + ("?" + parsed.query if parsed.query else "")
