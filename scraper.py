@@ -25,6 +25,8 @@ def stop_word_file(filename):
 STOP_WORDS = stop_word_file('stop_words.txt')
 
 def scraper(url, resp):
+    global longest_page
+    
     links = extract_next_links(url, resp)
 
     valid_links = [] # initialize empty list to store urls that will be added to the frontier
