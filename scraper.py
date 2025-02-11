@@ -23,6 +23,9 @@ def extract_next_links(url, resp):
     try:
         soup = BeautifulSoup(resp.raw_response.content, features="lxml") # raw_response.content gives you the webpage html content, pass additional argument of parser specified to lxml
         links = set() # create empty set to store UNIQUE URLs found on page
+
+        # defragment URL (removing the fragment part)
+        url = defragment(url)
         
         # urlparse breaks down URL into its compoentns (scheme, netloc, path, query, etc.)
         base_url = urlparse(url).scheme + "://" + urlparse(url).netloc # netloc aka authority
@@ -39,18 +42,11 @@ def extract_next_links(url, resp):
         return [] # returns empty list
     # return list()
 
-def defragment(url): # preserves the original url w/o fragment
-    parsed = urlparse(url)
-    return parsed.scheme + "://" + parsed.netloc + parsed.path + ("?" + parsed.query if parsed.query else"")
-
 def is_valid(url):
     # Decide whether to crawl this url or not. 
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
     try:
-        
-        # defragment URL (removing the fragment part)
-        url = defragment(url)
         parsed = urlparse(url)
 
         # only vaid if scheme is http or https
@@ -77,4 +73,9 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+
+
+def defragment(url): # preserves the original url w/o fragment
+    parsed = urlparse(url)
+    return parsed.scheme + "://" + parsed.netloc + parsed.path + ("?" + parsed.query if parsed.query else"")
 
