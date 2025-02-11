@@ -6,9 +6,29 @@ from bs4 import BeautifulSoup
 # only crawl the following URLS and paths (valid domains)
 VALID_DOMAINS = [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu"]
 
+# question 1: how many unique pages did you find? (discarding the fragment part)
+unique_pages = set()
+# longest_page is a map (link, word count) of the link with the highest word count
+longest_page = (None, 0)
+
 def scraper(url, resp):
     links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
+
+    valid_links = [] # initialize empty list to store urls that will be added to the frontier
+    for link in links:
+        if is_valid(link):
+            unique_pages.add(defragment(link)) # add unique pages to set
+            valid_links.append(link) # add all links (including the ones within each page) to list
+
+            # count words for each url
+            curr_count = count_words(resp.raw_response.content)
+            # if the current count of url is greater than highest word count, update longest_page
+            if curr_count > longest_page[1]:
+                longest_page = (link, curr_count) 
+        # return [link for link in links if is_valid(link)]
+
+
+    return valid_links
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -20,6 +40,7 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+
     try:
         soup = BeautifulSoup(resp.raw_response.content, features="lxml") # raw_response.content gives you the webpage html content, pass additional argument of parser specified to lxml
         links = set() # create empty set to store UNIQUE URLs found on page
@@ -79,3 +100,10 @@ def defragment(url): # preserves the original url w/o fragment
     parsed = urlparse(url)
     return parsed.scheme + "://" + parsed.netloc + parsed.path + ("?" + parsed.query if parsed.query else"")
 
+def count_words(url_content):
+    soup = BeautifulSoup(url_content, features="lxml")
+    # excludes html markup because html markup does not count as words
+    content = soup.get_text()
+    # use regular expression to count alphanumeric words and words with special characters
+    words = re.findall(r"\b[\w'-]+\b", content.lower())
+    return len(words)
