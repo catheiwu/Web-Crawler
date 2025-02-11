@@ -2,12 +2,19 @@ import re
 from urllib.parse import urlparse
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
+from collections import Counter # for question 3
+import os # reads in stop_words.txt for question 3
 
 # only crawl the following URLS and paths (valid domains)
 VALID_DOMAINS = [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu"]
 
 # question 1: how many unique pages did you find? (discarding the fragment part)
 unique_pages = set()
+# question 2: longest_page is a map (link, word count) of the link with the highest word count
+longest_page = (None, 0)
+#question 3: what are the 50 most common words in entire set of pages crawled under these domains?
+word_counter = Counter() 
+STOP_WORDS = stop_word_file('stop_words.txt')
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -18,7 +25,11 @@ def scraper(url, resp):
             unique_pages.add(defragment(link)) # add unique pages to set
             valid_links.append(link) # add all links (including the ones within each page) to list
 
-        # return [link for link in links if is_valid(link)]
+            # count words for each url
+            curr_count = count_words(resp.raw_response.content)
+            # if the current count of url is greater than highest word count, update longest_page
+            if curr_count > longest_page[1]:
+                longest_page = (link, curr_count)
 
 
     return valid_links
@@ -92,3 +103,25 @@ def is_valid(url):
 def defragment(url): # preserves the original url w/o fragment
     parsed = urlparse(url)
     return parsed.scheme + "://" + parsed.netloc + parsed.path + ("?" + parsed.query if parsed.query else"")
+
+def count_words(url_content): # question 2
+    soup = BeautifulSoup(url_content, features="lxml")
+    # excludes html markup because html markup does not count as words
+    content = soup.get_text()
+    # use regular expression to count alphanumeric words and words with special characters
+    words = re.findall(r"\b[\w'-]+\b", content.lower())
+    fifty_common(words)
+    return len(words)
+
+def fifty_common(words): # question 3 (void function)
+    not_stop_word = [] # initialize list to store remaining words after filtering out stop words
+    for word in words:
+        if word not in STOP_WORDS:
+            not_stop_word.append(word)
+
+    word_counter.update(not_stop_word) # word count should be smaller now without the stop words
+
+def stop_word_file(filename):
+    with open(filename, 'r') as file: # read in English stop words into a file
+        stop_words_list = (line.strip() for line in file.readlines())
+    return stop_words_list
