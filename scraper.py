@@ -6,9 +6,22 @@ from bs4 import BeautifulSoup
 # only crawl the following URLS and paths (valid domains)
 VALID_DOMAINS = [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu"]
 
+# question 1: how many unique pages did you find? (discarding the fragment part)
+unique_pages = set()
+
 def scraper(url, resp):
     links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
+
+    valid_links = [] # initialize empty list to store urls that will be added to the frontier
+    for link in links:
+        if is_valid(link):
+            unique_pages.add(defragment(link)) # add unique pages to set
+            valid_links.append(link) # add all links (including the ones within each page) to list
+
+        # return [link for link in links if is_valid(link)]
+
+
+    return valid_links
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -20,9 +33,13 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+
     try:
         soup = BeautifulSoup(resp.raw_response.content, features="lxml") # raw_response.content gives you the webpage html content, pass additional argument of parser specified to lxml
         links = set() # create empty set to store UNIQUE URLs found on page
+
+        # defragment URL (removing the fragment part)
+        url = defragment(url)
         
         # urlparse breaks down URL into its compoentns (scheme, netloc, path, query, etc.)
         base_url = urlparse(url).scheme + "://" + urlparse(url).netloc # netloc aka authority
@@ -39,18 +56,11 @@ def extract_next_links(url, resp):
         return [] # returns empty list
     # return list()
 
-def defragment(url): # preserves the original url w/o fragment
-    parsed = urlparse(url)
-    return parsed.scheme + "://" + parsed.netloc + parsed.path + ("?" + parsed.query if parsed.query else"")
-
 def is_valid(url):
     # Decide whether to crawl this url or not. 
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
     try:
-        
-        # defragment URL (removing the fragment part)
-        url = defragment(url)
         parsed = urlparse(url)
 
         # only vaid if scheme is http or https
@@ -77,3 +87,8 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+
+
+def defragment(url): # preserves the original url w/o fragment
+    parsed = urlparse(url)
+    return parsed.scheme + "://" + parsed.netloc + parsed.path + ("?" + parsed.query if parsed.query else"")
