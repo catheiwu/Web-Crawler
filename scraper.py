@@ -14,6 +14,12 @@ unique_pages = set()
 longest_page = (None, 0)
 #question 3: what are the 50 most common words in entire set of pages crawled under these domains?
 word_counter = Counter() 
+
+def stop_word_file(filename):
+    with open(filename, 'r') as file: # read in English stop words into a file
+        stop_words_list = (line.strip() for line in file.readlines())
+    return stop_words_list
+
 STOP_WORDS = stop_word_file('stop_words.txt')
 
 def scraper(url, resp):
@@ -120,8 +126,3 @@ def fifty_common(words): # question 3 (void function)
             not_stop_word.append(word)
 
     word_counter.update(not_stop_word) # word count should be smaller now without the stop words
-
-def stop_word_file(filename):
-    with open(filename, 'r') as file: # read in English stop words into a file
-        stop_words_list = (line.strip() for line in file.readlines())
-    return stop_words_list
