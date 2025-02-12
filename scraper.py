@@ -86,6 +86,9 @@ def extract_next_links(url, resp):
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
 
     try:
+        if resp.status != 200:
+            return []
+
         soup = BeautifulSoup(resp.raw_response.content, features="lxml") # raw_response.content gives you the webpage html content, pass additional argument of parser specified to lxml
         links = set() # create empty set to store UNIQUE URLs found on page
 
@@ -204,3 +207,23 @@ def near_duplicate(curr_simhash, threshold = 0.90):
         if similarity(curr_simhash, compare_simhash) >= threshold:
             return True
     return False
+    
+def write_report():
+    with open('report.txt', 'w') as report_file:
+
+        # Question 1: how many unique pages did you find? (as established by the URL, discarding the fragment part)
+        report_file.write(f"Question 1: {len(unique_pages)} unique pages found\n\n")
+
+        # Question 2: What is the longest page in terms of the number of words?
+        report_file.write(f"Question 2: The longest page was {longest_page[0]} with {longest_page[1]} words\n\n")
+
+        # Question 3: 50 most common words in the entire set of pages crawled under these domains
+        report_file.write("Question 3: 50 most common words crawled under these domains\n")
+        common_words = word_counter.most_common(50)
+        for word, count in common_words:
+            report_file.write(f"{word}: {count}\n")
+
+        # Question 4: Subdomains found in the ics.uci.edu domain
+        report_file.write("Question 4: Subdomains found in the ics.uci.edu domain")
+        for subdomain, count in sorted(subdomain_count.items()):
+            report_file.write(f"{subdomain}, {count}\n")
