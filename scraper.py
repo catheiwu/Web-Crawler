@@ -1,4 +1,5 @@
 import re
+import simhash # for near duplicate detection
 from urllib.parse import urlparse
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
@@ -18,6 +19,8 @@ word_counter = Counter()
 subdomain_count = {}
 # global variable to keep track of the checksums of pages crawled
 seen_checksums = set()
+# global variable to keep track of the simhash fingerprints of pages crawled
+seen_simhash = set()
 
 def stop_word_file(filename):
     with open(filename, 'r') as file: # read in English stop words into a file
@@ -39,6 +42,16 @@ def scraper(url, resp):
     # if exact duplicate, then do not scrape url
     if curr_checksum in seen_checksums:
         return []
+
+    # compute simhash of the url's content (resp.raw_response.content)
+    curr_simhash = compute_simhash(resp.raw_response.content)
+    
+    # if curr_simhash is a near duplicate, then do not scrape
+    # if not a near duplicate, add it to set of seen_simhash
+    if near_duplicate(curr_simhash):
+        return []
+    else:
+        seen_simhash.add(curr_simhash)
 
     global longest_page
 
@@ -116,8 +129,12 @@ def is_valid(url):
         if not any(re.search(valid_domain, domain) for valid_domain in VALID_DOMAINS):
             return False
         
-        # Reject if the subdomain is "grapes.ics.uci.edu"
-        if domain in set(["grapes.ics.uci.edu", "sli.ics.uci.edu", "wiki.ics.uci.edu"]):
+        # Reject if the subdomain is in this set
+        if domain in set(["grapes.ics.uci.edu", "sli.ics.uci.edu", "wiki.ics.uci.edu", "swiki.ics.uci.edu"]):
+            return False
+        
+        # Do not crawl if it is a calendar event, web trap
+        if parsed.path.startswith("/events"):
             return False
         
         # not valid if url does not point to a webpage
@@ -166,6 +183,31 @@ def count_subdomain_pages(link):
         else:
             subdomain_count[subdomain] = 1
 
+def compute_simhash(content):
+    soup = BeautifulSoup(content, features="lxml")
+    content = soup.get_text()
+    # use regular expression to count alphanumeric words and words with special characters
+    words = re.findall(r"\b[\w'-]+\b", content.lower())
+    return (simhash.Simhash(words)).value
+
+def similarity(curr_simhash, compare_simhash, bit_length=64):
+    # apply xor operation = 1's is number of different bits
+    # negate = 0's is number of same bits
+    new_xor = curr_simhash ^ compare_simhash
+
+    # how many bits that are 0 in new_xor = intersection of bits
+    num_zeroes = bin(new_xor).count('0') - 1
+    # return similarity
+    return num_zeroes / bit_length
+
+def near_duplicate(curr_simhash, threshold = 0.90):
+    # compare with all seen_simhash set
+    for compare_simhash in seen_simhash:
+        # similarity = fraction of bits that are the same over all n bits of representation
+        if similarity(curr_simhash, compare_simhash) >= threshold:
+            return True
+    return False
+    
 def write_report():
     with open('report.txt', 'w') as report_file:
 
