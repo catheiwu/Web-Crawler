@@ -16,6 +16,8 @@ longest_page = (None, 0)
 word_counter = Counter() 
 # question 4: mapping subdomains in the ics.uci.edu domain to number of pages
 subdomain_count = {}
+# global variable to keep track of the checksums of pages crawled
+seen_checksums = set()
 
 def stop_word_file(filename):
     with open(filename, 'r') as file: # read in English stop words into a file
@@ -25,8 +27,21 @@ def stop_word_file(filename):
 STOP_WORDS = stop_word_file('stop_words.txt')
 
 def scraper(url, resp):
-    global longest_page
+
+    # only scrape from links with status = 200
+    if resp.status != 200 or resp.raw_response is None:
+        return []
     
+    # checksum is sum of bytes in the document file (from lecture notes)
+    # note that some documents that are not exact can have same sum of bytes
+    curr_checksum = sum(resp.raw_response.content)
+
+    # if exact duplicate, then do not scrape url
+    if curr_checksum in seen_checksums:
+        return []
+
+    global longest_page
+
     links = extract_next_links(url, resp)
 
     valid_links = [] # initialize empty list to store urls that will be added to the frontier
@@ -70,6 +85,8 @@ def extract_next_links(url, resp):
         for anchor in soup.find_all("a", href=True): # find all anchor tags <a> that define href attributes (hyperlinks)
             # transform relative to absolute URLs
             absolute_url = urljoin(base_url, anchor["href"].strip()) # constructs full url by joining base w/ whatever hyperlinks are found on page
+            # defragment the absolute_url
+            absolute_url = defragment(absolute_url)
             links.add(absolute_url)
 
         return list(links) # converts set (uniqueness) to list (return value)
@@ -96,9 +113,13 @@ def is_valid(url):
         if not any(re.search(valid_domain, domain) for valid_domain in VALID_DOMAINS):
             return False
         
+        # Reject if the subdomain is "grapes.ics.uci.edu"
+        if domain in set(["grapes.ics.uci.edu", "sli.ics.uci.edu", "wiki.ics.uci.edu"]):
+            return False
+        
         # not valid if url does not point to a webpage
         return not re.match(
-            r".*\.(css|js|bmp|gif|jpe?g|ico"
+            r".*\.(css|js|bmp|gif|jpe?g|ico|pdf|zip"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
