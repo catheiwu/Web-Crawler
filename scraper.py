@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from collections import Counter # for question 3
+from collections import defaultdict 
 import os # reads in stop_words.txt for question 3
 
 # only crawl the following URLS and paths (valid domains)
@@ -98,12 +99,26 @@ def extract_next_links(url, resp):
         # urlparse breaks down URL into its compoentns (scheme, netloc, path, query, etc.)
         base_url = urlparse(url).scheme + "://" + urlparse(url).netloc # netloc aka authority
 
+        path_counts =  defaultdict(int) # create map to store the key: path and the value: count
+        absolute_urls = set() # create empty set of absolute urls
+
         for anchor in soup.find_all("a", href=True): # find all anchor tags <a> that define href attributes (hyperlinks)
             # transform relative to absolute URLs
             absolute_url = urljoin(base_url, anchor["href"].strip()) # constructs full url by joining base w/ whatever hyperlinks are found on page
             # defragment the absolute_url
             absolute_url = defragment(absolute_url)
-            links.add(absolute_url)
+            
+            # keep track of how many absolute_urls there are with a path that is extracted less than 20 times
+            path = urlparse(absolute_url).netloc
+            path_counts[path] += 1
+            # if the url has a path that is the same as less than 20 other urls, add it to absolute_urls
+            if path_counts[path] <= 20:
+                absolute_urls.add(absolute_url)
+
+        # only extract links that does not have paths similar to 20 other links
+        for link in absolute_urls:
+            if path_counts[urlparse(link).netloc] <= 20:
+                links.add(link)
 
         return list(links) # converts set (uniqueness) to list (return value)
     
@@ -130,11 +145,7 @@ def is_valid(url):
             return False
         
         # Reject if the subdomain is in this set
-        if domain in set(["grapes.ics.uci.edu", "sli.ics.uci.edu", "wiki.ics.uci.edu", "swiki.ics.uci.edu"]):
-            return False
-        
-        # Do not crawl if it is a calendar event, web trap
-        if parsed.path.startswith("/events"):
+        if domain in set(["grape.ics.uci.edu", "sli.ics.uci.edu", "wiki.ics.uci.edu", "swiki.ics.uci.edu"]):
             return False
         
         # not valid if url does not point to a webpage
@@ -222,8 +233,9 @@ def write_report():
         common_words = word_counter.most_common(50)
         for word, count in common_words:
             report_file.write(f"{word}: {count}\n")
+        report_file.write("\n")
 
         # Question 4: Subdomains found in the ics.uci.edu domain
-        report_file.write("Question 4: Subdomains found in the ics.uci.edu domain")
+        report_file.write("Question 4: Subdomains found in the ics.uci.edu domain\n")
         for subdomain, count in sorted(subdomain_count.items()):
             report_file.write(f"{subdomain}, {count}\n")
