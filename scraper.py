@@ -8,7 +8,6 @@ from collections import defaultdict
 import os # reads in stop_words.txt for question 3
 from urllib.robotparser import RobotFileParser
 from utils.download import download_robots_txt # to download robots.txt
-import urllib.request
 
 # only crawl the following URLS and paths (valid domains)
 VALID_DOMAINS = [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu"]
@@ -60,13 +59,11 @@ def scraper(url, resp):
     # for each sitemap, check if status is 200 and if it is not in the robots.txt, then append to links
     if sitemaps:
         for sitemap in sitemaps:
-            response = urllib.request.urlopen(sitemap)
-            if response.status == 200:
-                soup = BeautifulSoup(response.read(), 'xml')
-                for location in soup.find_all('loc'):
-                    sitemap_url = loc.text
-                    if robots_txt and not rp.can_fetch('*', url):
-                        links.append(url)
+            soup = BeautifulSoup(response.read(), 'xml')
+            for location in soup.find_all('loc'):
+                sitemap_url = loc.text
+                if robots_txt and not rp.can_fetch('*', url):
+                    links.append(url)
 
     # checksum is sum of bytes in the document file (from lecture notes)
     # note that some documents that are not exact can have same sum of bytes
