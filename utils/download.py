@@ -1,21 +1,42 @@
-import requests
-import cbor
-import time
+# import requests
+# import cbor
+# import time
 
+# from utils.response import Response
+
+# def download(url, config, logger=None):
+#     host, port = config.cache_server
+#     resp = requests.get(
+#         f"http://{host}:{port}/",
+#         params=[("q", f"{url}"), ("u", f"{config.user_agent}")])
+#     try:
+#         if resp and resp.content:
+#             return Response(cbor.loads(resp.content))
+#     except (EOFError, ValueError) as e:
+#         pass
+#     logger.error(f"Spacetime Response error {resp} with url {url}.")
+#     return Response({
+#         "error": f"Spacetime Response error {resp} with url {url}.",
+#         "status": resp.status_code,
+#         "url": url})
+
+
+import requests
+from urllib.parse import urlparse
 from utils.response import Response
 
 def download(url, config, logger=None):
-    host, port = config.cache_server
-    resp = requests.get(
-        f"http://{host}:{port}/",
-        params=[("q", f"{url}"), ("u", f"{config.user_agent}")])
+    parsed_url = urlparse(url)
+    robots_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
+
     try:
-        if resp and resp.content:
-            return Response(cbor.loads(resp.content))
-    except (EOFError, ValueError) as e:
-        pass
-    logger.error(f"Spacetime Response error {resp} with url {url}.")
-    return Response({
-        "error": f"Spacetime Response error {resp} with url {url}.",
-        "status": resp.status_code,
-        "url": url})
+        response = requests.get(robots_url)
+
+        if response.status_code == 200:
+            return Response({"robots_txt": response.text})
+        else:
+            return Response({"error": error_message, "status": response.status_code})
+
+    except requests.exceptions.RequestException as e:
+        error_message = f"Error fetching robots.txt from {robots_url}: {e}"
+        return Response({"error": error_message})

@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from collections import Counter # for question 3
+from collections import defaultdict 
 import os # reads in stop_words.txt for question 3
 
 # only crawl the following URLS and paths (valid domains)
@@ -24,7 +25,7 @@ seen_simhash = set()
 
 def stop_word_file(filename):
     with open(filename, 'r') as file: # read in English stop words into a file
-        stop_words_list = (line.strip() for line in file.readlines())
+        stop_words_list = [line.strip() for line in file.readlines()]
     return stop_words_list
 
 STOP_WORDS = stop_word_file('stop_words.txt')
@@ -90,6 +91,16 @@ def extract_next_links(url, resp):
             return []
 
         soup = BeautifulSoup(resp.raw_response.content, features="lxml") # raw_response.content gives you the webpage html content, pass additional argument of parser specified to lxml
+        
+        # do not extract links from status 400 urls
+        url_content = soup.get_text()
+        if "Whoops! We are having trouble locating your page!" in url_content:
+            return []
+        if "Not Found" in url_content:
+            return []
+        if "Forbidden" in url_content:
+            return []
+        
         links = set() # create empty set to store UNIQUE URLs found on page
 
         # defragment URL (removing the fragment part)
@@ -98,12 +109,26 @@ def extract_next_links(url, resp):
         # urlparse breaks down URL into its compoentns (scheme, netloc, path, query, etc.)
         base_url = urlparse(url).scheme + "://" + urlparse(url).netloc # netloc aka authority
 
+        path_counts =  defaultdict(int) # create map to store the key: path and the value: count
+        absolute_urls = set() # create empty set of absolute urls
+
         for anchor in soup.find_all("a", href=True): # find all anchor tags <a> that define href attributes (hyperlinks)
             # transform relative to absolute URLs
             absolute_url = urljoin(base_url, anchor["href"].strip()) # constructs full url by joining base w/ whatever hyperlinks are found on page
             # defragment the absolute_url
             absolute_url = defragment(absolute_url)
-            links.add(absolute_url)
+            
+            # keep track of how many absolute_urls there are with a path that is extracted less than 20 times
+            path = urlparse(absolute_url).netloc
+            path_counts[path] += 1
+            # if the url has a path that is the same as less than 20 other urls, add it to absolute_urls
+            if path_counts[path] <= 20:
+                absolute_urls.add(absolute_url)
+
+        # only extract links that does not have paths similar to 20 other links
+        for link in absolute_urls:
+            if path_counts[urlparse(link).netloc] <= 20:
+                links.add(link)
 
         return list(links) # converts set (uniqueness) to list (return value)
     
@@ -130,11 +155,7 @@ def is_valid(url):
             return False
         
         # Reject if the subdomain is in this set
-        if domain in set(["grapes.ics.uci.edu", "sli.ics.uci.edu", "wiki.ics.uci.edu", "swiki.ics.uci.edu"]):
-            return False
-        
-        # Do not crawl if it is a calendar event, web trap
-        if parsed.path.startswith("/events"):
+        if domain in set(["grape.ics.uci.edu", "sli.ics.uci.edu", "wiki.ics.uci.edu", "swiki.ics.uci.edu"]):
             return False
         
         # not valid if url does not point to a webpage
@@ -222,10 +243,9 @@ def write_report():
         common_words = word_counter.most_common(50)
         for word, count in common_words:
             report_file.write(f"{word}: {count}\n")
+        report_file.write("\n")
 
         # Question 4: Subdomains found in the ics.uci.edu domain
-        report_file.write("Question 4: Subdomains found in the ics.uci.edu domain")
-        for subdomain, count in sorted(subdomain_count.items()):
+        report_file.write("Question 4: Subdomains found in the ics.uci.edu domain\n")
+        for subdomain, count in sorted(subdomain_count.items(), key=lambda item: (-item[1], item[0])):
             report_file.write(f"{subdomain}, {count}\n")
-
-write_report()
