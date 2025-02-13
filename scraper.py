@@ -38,32 +38,37 @@ def scraper(url, resp):
     if resp.status != 200 or resp.raw_response is None:
         return []
     
-    # download the robots.txt and parse
-    robots_txt = download_robots_txt(url)
-    rp = RobotFileParser()
-    # if robots.txt file exists, then parse it
-    if robots_txt:
-        rp.parse(robots_txt.splitlines())
-
-    # if url is not allowed by robots.txt, then do not extract links
-    if not rp.can_fetch('*',url):
-        return []
-    
     links = []
 
-    # if there are sitemaps found in robots.txt, then scrape url from the sitemap
-    sitemaps = [] # empty list of the sitemaps found in robots.txt
-    if rp.site_maps():
-        for sitemap in rp.site_maps():
-            sitemaps.append(sitemap)
-    # for each sitemap, check if status is 200 and if it is not in the robots.txt, then append to links
-    if sitemaps:
-        for sitemap in sitemaps:
-            soup = BeautifulSoup(response.read(), 'xml')
-            for location in soup.find_all('loc'):
-                sitemap_url = loc.text
-                if robots_txt and not rp.can_fetch('*', url):
-                    links.append(url)
+    # download the robots.txt and parse
+    robots_txt_resp = download_robots_txt(url)
+
+    if robots_txt_resp.status == 200 and "robots_txt" in robots_txt_resp.__dict__:
+        robots_txt = robots_txt_resp.__dict__["robots_txt"]
+    
+        rp = RobotFileParser()
+
+        # if robots.txt file exists, then parse it
+        if robots_txt:
+            rp.parse(robots_txt.splitlines())
+
+        # if url is not allowed by robots.txt, then do not extract links
+        if not rp.can_fetch('*',url):
+            return []
+
+        # if there are sitemaps found in robots.txt, then scrape url from the sitemap
+        sitemaps = [] # empty list of the sitemaps found in robots.txt
+        if rp.site_maps():
+            for sitemap in rp.site_maps():
+                sitemaps.append(sitemap)
+        # for each sitemap, check if status is 200 and if it is not in the robots.txt, then append to links
+        if sitemaps:
+            for sitemap in sitemaps:
+                soup = BeautifulSoup(response.read(), 'xml')
+                for location in soup.find_all('loc'):
+                    sitemap_url = loc.text
+                    if robots_txt and not rp.can_fetch('*', url):
+                        links.append(url)
 
     # checksum is sum of bytes in the document file (from lecture notes)
     # note that some documents that are not exact can have same sum of bytes
