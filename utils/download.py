@@ -30,6 +30,7 @@ def download_robots_txt(url):
         if response.status_code == 200:
             return Response({"robots_txt": response.text, "status": response.status_code, "url": robots_url})
         else:
+            error_message = f"Failed to fetch robots.txt: HTTP {response.status_code}"
             return Response({"error": error_message, "status": response.status_code, "url": robots_url})
 
     except requests.exceptions.RequestException as e:
