@@ -6,6 +6,9 @@ from bs4 import BeautifulSoup
 from collections import Counter # for question 3
 from collections import defaultdict 
 import os # reads in stop_words.txt for question 3
+from urllib.robotparser import RobotFileParser
+from utils.download import download_robots_txt # to download robots.txt
+import urllib.request
 
 # only crawl the following URLS and paths (valid domains)
 VALID_DOMAINS = [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu"]
@@ -36,6 +39,35 @@ def scraper(url, resp):
     if resp.status != 200 or resp.raw_response is None:
         return []
     
+    # download the robots.txt and parse
+    robots_txt = download_robots_txt(url)
+    rp = RobotFileParser()
+    # if robots.txt file exists, then parse it
+    if robots_txt:
+        rp.parse(robots_txt.splitlines())
+
+    # if url is not allowed by robots.txt, then do not extract links
+    if not rp.can_fetch('*',url):
+        return []
+    
+    links = []
+
+    # if there are sitemaps found in robots.txt, then scrape url from the sitemap
+    sitemaps = [] # empty list of the sitemaps found in robots.txt
+    if rp.site_maps():
+        for sitemap in rp.site_maps():
+            sitemaps.append(sitemap)
+    # for each sitemap, check if status is 200 and if it is not in the robots.txt, then append to links
+    if sitemaps:
+        for sitemap in sitemaps:
+            response = urllib.request.urlopen(sitemap)
+            if response.status == 200:
+                soup = BeautifulSoup(response.read(), 'xml')
+                for location in soup.find_all('loc'):
+                    sitemap_url = loc.text
+                    if robots_txt and not rp.can_fetch('*', url):
+                        links.append(url)
+
     # checksum is sum of bytes in the document file (from lecture notes)
     # note that some documents that are not exact can have same sum of bytes
     curr_checksum = sum(resp.raw_response.content)
@@ -56,7 +88,7 @@ def scraper(url, resp):
 
     global longest_page
 
-    links = extract_next_links(url, resp)
+    links.extend(extract_next_links(url, resp))
 
     valid_links = [] # initialize empty list to store urls that will be added to the frontier
     for link in links:
