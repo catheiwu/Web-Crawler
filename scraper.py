@@ -25,7 +25,7 @@ seen_simhash = set()
 
 def stop_word_file(filename):
     with open(filename, 'r') as file: # read in English stop words into a file
-        stop_words_list = (line.strip() for line in file.readlines())
+        stop_words_list = [line.strip() for line in file.readlines()]
     return stop_words_list
 
 STOP_WORDS = stop_word_file('stop_words.txt')
@@ -91,6 +91,16 @@ def extract_next_links(url, resp):
             return []
 
         soup = BeautifulSoup(resp.raw_response.content, features="lxml") # raw_response.content gives you the webpage html content, pass additional argument of parser specified to lxml
+        
+        # do not extract links from status 400 urls
+        url_content = soup.get_text()
+        if "Whoops! We are having trouble locating your page!" in url_content:
+            return []
+        if "Not Found" in url_content:
+            return []
+        if "Forbidden" in url_content:
+            return []
+        
         links = set() # create empty set to store UNIQUE URLs found on page
 
         # defragment URL (removing the fragment part)
@@ -237,5 +247,5 @@ def write_report():
 
         # Question 4: Subdomains found in the ics.uci.edu domain
         report_file.write("Question 4: Subdomains found in the ics.uci.edu domain\n")
-        for subdomain, count in sorted(subdomain_count.items()):
+        for subdomain, count in sorted(subdomain_count.items(), key=lambda item: (-item[1], item[0])):
             report_file.write(f"{subdomain}, {count}\n")
