@@ -8,9 +8,10 @@ from collections import defaultdict
 import os # reads in stop_words.txt for question 3
 from urllib.robotparser import RobotFileParser
 from utils.download import download_robots_txt # to download robots.txt
+from utils.download import download # to download sitemaps
 
 # only crawl the following URLS and paths (valid domains)
-VALID_DOMAINS = [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu"]
+VALID_DOMAINS = ["cs.uci.edu","ics.uci.edu","informatics.uci.edu","stat.uci.edu"]
 
 # question 1: how many unique pages did you find? (discarding the fragment part)
 unique_pages = set()
@@ -24,6 +25,8 @@ subdomain_count = {}
 seen_checksums = set()
 # global variable to keep track of the simhash fingerprints of pages crawled
 seen_simhash = set()
+path_counts =  defaultdict(int) # create map to store the key: path and the value: count
+domain_counts = defaultdict(int) #create map to store the key: domain and the value: count
 
 def stop_word_file(filename):
     with open(filename, 'r') as file: # read in English stop words into a file
@@ -57,18 +60,20 @@ def scraper(url, resp):
             return []
 
         # if there are sitemaps found in robots.txt, then scrape url from the sitemap
-        sitemaps = [] # empty list of the sitemaps found in robots.txt
         if rp.site_maps():
+            sitemaps = [] # empty list of the sitemaps found in robots.txt
             for sitemap in rp.site_maps():
                 sitemaps.append(sitemap)
-        # for each sitemap, check if status is 200 and if it is not in the robots.txt, then append to links
-        if sitemaps:
+
+            # for each sitemap, check if status is 200 and if it is not in the robots.txt, then append to links
             for sitemap in sitemaps:
-                soup = BeautifulSoup(response.read(), 'xml')
-                for location in soup.find_all('loc'):
-                    sitemap_url = loc.text
-                    if robots_txt and not rp.can_fetch('*', url):
-                        links.append(url)
+                sitemap_resp = download(sitemap, config=None)
+                if sitemap_resp.status == 200 and sitemap_resp.raw_response:
+                    soup = BeautifulSoup(sitemap_resp.raw_response.content, 'xml')
+                    for location in soup.find_all('loc'):
+                        sitemap_url = location.text.strip()
+                        if rp.can_fetch('*', sitemap_url):
+                            links.append(sitemap_url)
 
     # checksum is sum of bytes in the document file (from lecture notes)
     # note that some documents that are not exact can have same sum of bytes
@@ -95,7 +100,6 @@ def scraper(url, resp):
     valid_links = [] # initialize empty list to store urls that will be added to the frontier
     for link in links:
         if is_valid(link):
-            unique_pages.add(defragment(link)) # add unique pages to set
             valid_links.append(link) # add all links (including the ones within each page) to list
 
             # count words for each url
@@ -106,6 +110,7 @@ def scraper(url, resp):
                 
             # for the link, count it as a unique page if it is a subdomain in ics.uci.edu
             count_subdomain_pages(link)
+            unique_pages.add(link) # add unique pages to set
 
     return valid_links
 
@@ -143,26 +148,12 @@ def extract_next_links(url, resp):
         # urlparse breaks down URL into its compoentns (scheme, netloc, path, query, etc.)
         base_url = urlparse(url).scheme + "://" + urlparse(url).netloc # netloc aka authority
 
-        path_counts =  defaultdict(int) # create map to store the key: path and the value: count
-        absolute_urls = set() # create empty set of absolute urls
-
         for anchor in soup.find_all("a", href=True): # find all anchor tags <a> that define href attributes (hyperlinks)
             # transform relative to absolute URLs
             absolute_url = urljoin(base_url, anchor["href"].strip()) # constructs full url by joining base w/ whatever hyperlinks are found on page
             # defragment the absolute_url
             absolute_url = defragment(absolute_url)
-            
-            # keep track of how many absolute_urls there are with a path that is extracted less than 20 times
-            path = urlparse(absolute_url).netloc
-            path_counts[path] += 1
-            # if the url has a path that is the same as less than 20 other urls, add it to absolute_urls
-            if path_counts[path] <= 20:
-                absolute_urls.add(absolute_url)
-
-        # only extract links that does not have paths similar to 20 other links
-        for link in absolute_urls:
-            if path_counts[urlparse(link).netloc] <= 20:
-                links.add(link)
+            links.add(absolute_url)
 
         return list(links) # converts set (uniqueness) to list (return value)
     
@@ -188,20 +179,44 @@ def is_valid(url):
         if not any(re.search(valid_domain, domain) for valid_domain in VALID_DOMAINS):
             return False
         
+        # filter out calendar events
+        if parsed.path.startswith("/event"):
+            return False
+        
+        # filter out profile pages
+        if parsed.path.startswith("/people"):
+            return False
+        
+        if domain.startswith("economics"):
+            return False
+        
+        # keep track of how many absolute_urls there are with a path that is extracted less than 30 times
+        path = parsed.path.lower()
+        path_counts[path] += 1
+        # keep track of how many absolute_urls there are with a domain that is extracted less than 200 times
+        domain_counts[domain] += 1
+        #print(f"Domain: {domain} Count: {domain_counts[domain]}")
+        # if the url has a path that is the same as less than 30 other urls, add it to absolute_urls
+        if (path_counts[path] >= 75):
+            return False
+        # if the domain occurs more than 500 times and is not one of the valid domains, is not valid
+        if (domain_counts[domain] >= 3000) and not any(domain == valid_domain for valid_domain in VALID_DOMAINS):
+            return False
+        
         # Reject if the subdomain is in this set
         if domain in set(["grape.ics.uci.edu", "sli.ics.uci.edu", "wiki.ics.uci.edu", "swiki.ics.uci.edu"]):
             return False
         
         # not valid if url does not point to a webpage
         return not re.match(
-            r".*\.(css|js|bmp|gif|jpe?g|ico|pdf|zip"
+            r".*\.(css|js|bmp|gif|jpe?g|ico|pdf|zip|ppsx"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ppsx)$", parsed.path.lower())
 
     except TypeError:
         print ("TypeError for ", parsed)
@@ -255,7 +270,7 @@ def similarity(curr_simhash, compare_simhash, bit_length=64):
     # return similarity
     return num_zeroes / bit_length
 
-def near_duplicate(curr_simhash, threshold = 0.90):
+def near_duplicate(curr_simhash, threshold = 0.975):
     # compare with all seen_simhash set
     for compare_simhash in seen_simhash:
         # similarity = fraction of bits that are the same over all n bits of representation
