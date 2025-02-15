@@ -176,6 +176,8 @@ def is_valid(url):
         # only valid if domain is in VALID_DOMAINS
         # parse.netloc.lower() returns the domain and port
         domain = parsed.netloc.lower()
+        if domain.startswith("www."):
+            domain = domain[4:]
         if not any(re.search(valid_domain, domain) for valid_domain in VALID_DOMAINS):
             return False
         
@@ -187,7 +189,14 @@ def is_valid(url):
         if parsed.path.startswith("/people"):
             return False
         
-        if domain.startswith("economics"):
+        # filter out sites with status 404
+        if parsed.path.startswith("/publications"):
+            return False
+        
+        if parsed.path.startswith("/courses"):
+            return False
+        
+        if domain == "economics.uci.edu":
             return False
         
         # keep track of how many absolute_urls there are with a path that is extracted less than 30 times
@@ -210,7 +219,7 @@ def is_valid(url):
         # not valid if url does not point to a webpage
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico|pdf|zip|ppsx"
-            + r"|png|tiff?|mid|mp2|mp3|mp4"
+            + r"|png|tiff?|mid|mp2|mp3|mp4|xhtml"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
