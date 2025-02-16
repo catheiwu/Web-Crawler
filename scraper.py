@@ -193,10 +193,22 @@ def is_valid(url):
         if parsed.path.startswith("/publications"):
             return False
         
+        if parsed.path.startswith("/wgEncodeBroadHistone"):
+            return False
+        
+        if parsed.path.startswith("/happening/news/page"):
+            return False
+        
+        if parsed.path.startswith("/happening/news/page"):
+            return False
+        
         if parsed.path.startswith("/courses"):
             return False
         
         if domain == "economics.uci.edu":
+            return False
+        
+        if domain == "cecs.uci.edu":
             return False
         
         # keep track of how many absolute_urls there are with a path that is extracted less than 30 times
@@ -218,13 +230,13 @@ def is_valid(url):
         
         # not valid if url does not point to a webpage
         return not re.match(
-            r".*\.(css|js|bmp|gif|jpe?g|ico|pdf|zip|ppsx"
-            + r"|png|tiff?|mid|mp2|mp3|mp4|xhtml"
+            r".*\.(css|js|bmp|gif|jpe?g|ico|pdf|zip|ppsx|txt|shtml"
+            + r"|png|tiff?|mid|mp2|mp3|mp4|xhtml|eva"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
-            + r"|epub|dll|cnf|tgz|sha1"
-            + r"|thmx|mso|arff|rtf|jar|csv"
+            + r"|epub|dll|cnf|tgz|sha1|jsp|emx|gif|agns"
+            + r"|thmx|mso|arff|rtf|jar|csv|heic"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ppsx)$", parsed.path.lower())
 
     except TypeError:
