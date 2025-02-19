@@ -185,6 +185,10 @@ def is_valid(url):
         if parsed.path.startswith("/event"):
             return False
         
+        # filter out calendar events
+        if parsed.path.startswith("/tag"):
+            return False
+        
         # filter out profile pages
         if parsed.path.startswith("/people"):
             return False
@@ -211,6 +215,14 @@ def is_valid(url):
         if domain == "cecs.uci.edu":
             return False
         
+        # do not check code differences e.g. side by side differences
+        if "diff" in parsed.path or "diff" in parsed.query:
+            return False
+        
+        # do not check old revisions of documents
+        if "rev" in parsed.query:
+            return False
+        
         # keep track of how many absolute_urls there are with a path that is extracted less than 30 times
         path = parsed.path.lower()
         path_counts[path] += 1
@@ -218,10 +230,10 @@ def is_valid(url):
         domain_counts[domain] += 1
         #print(f"Domain: {domain} Count: {domain_counts[domain]}")
         # if the url has a path that is the same as less than 30 other urls, add it to absolute_urls
-        if (path_counts[path] >= 75):
+        if (path_counts[path] >= 50):
             return False
-        # if the domain occurs more than 500 times and is not one of the valid domains, is not valid
-        if (domain_counts[domain] >= 3000) and not any(domain == valid_domain for valid_domain in VALID_DOMAINS):
+        # if the domain occurs more than 2500 times and is not one of the valid domains, is not valid
+        if (domain_counts[domain] >= 2500) and not any(domain == valid_domain for valid_domain in VALID_DOMAINS):
             return False
         
         # Reject if the subdomain is in this set
@@ -231,11 +243,11 @@ def is_valid(url):
         # not valid if url does not point to a webpage
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico|pdf|zip|ppsx|txt|shtml"
-            + r"|png|tiff?|mid|mp2|mp3|mp4|xhtml|eva|htm"
-            + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
+            + r"|png|tiff?|mid|mp2|mp3|mp4|xhtml|eva|htm|in"
+            + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pd"
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
-            + r"|epub|dll|cnf|tgz|sha1|jsp|emx|gif|agns"
+            + r"|epub|dll|cnf|tgz|sha1|jsp|emx|gif|agns|java"
             + r"|thmx|mso|arff|rtf|jar|csv|heic|pps|rkt|scm|ss|sln"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ppsx)$", parsed.path.lower())
 
@@ -260,7 +272,8 @@ def count_words(url_content): # question 2
 def fifty_common(words): # question 3 (void function)
     not_stop_word = [] # initialize list to store remaining words after filtering out stop words
     for word in words:
-        if word not in STOP_WORDS:
+        # only add word if it is not a stop word and the length of the word is greater than 2
+        if word not in STOP_WORDS and len(word) >= 2:
             not_stop_word.append(word)
 
     word_counter.update(not_stop_word) # word count should be smaller now without the stop words
@@ -291,7 +304,8 @@ def similarity(curr_simhash, compare_simhash, bit_length=64):
     # return similarity
     return num_zeroes / bit_length
 
-def near_duplicate(curr_simhash, threshold = 0.975):
+# change near_duplicate threshold?
+def near_duplicate(curr_simhash, threshold = 0.8):
     # compare with all seen_simhash set
     for compare_simhash in seen_simhash:
         # similarity = fraction of bits that are the same over all n bits of representation
