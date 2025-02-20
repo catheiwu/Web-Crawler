@@ -185,10 +185,6 @@ def is_valid(url):
         if parsed.path.startswith("/event"):
             return False
         
-        # filter out calendar events
-        if parsed.path.startswith("/tag"):
-            return False
-        
         # filter out profile pages
         if parsed.path.startswith("/people"):
             return False
@@ -197,15 +193,15 @@ def is_valid(url):
         if parsed.path.startswith("/publications"):
             return False
         
+        # filter out web trap
         if parsed.path.startswith("/wgEncodeBroadHistone"):
             return False
         
-        if parsed.path.startswith("/happening/news/page"):
+        # filter news pages , status 602
+        if parsed.path.startswith("/happening/news"):
             return False
         
-        if parsed.path.startswith("/happening/news/page"):
-            return False
-        
+        # filter out all the courses
         if parsed.path.startswith("/courses"):
             return False
         
@@ -230,10 +226,10 @@ def is_valid(url):
         domain_counts[domain] += 1
         #print(f"Domain: {domain} Count: {domain_counts[domain]}")
         # if the url has a path that is the same as less than 30 other urls, add it to absolute_urls
-        if (path_counts[path] >= 50):
+        if (path_counts[path] >= 75):
             return False
         # if the domain occurs more than 2500 times and is not one of the valid domains, is not valid
-        if (domain_counts[domain] >= 2500) and not any(domain == valid_domain for valid_domain in VALID_DOMAINS):
+        if (domain_counts[domain] >= 3000) and not any(domain == valid_domain for valid_domain in VALID_DOMAINS):
             return False
         
         # Reject if the subdomain is in this set
